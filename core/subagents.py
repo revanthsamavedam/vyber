@@ -14,7 +14,7 @@ MODEL = get_model()
 planner_agent = Agent(
     MODEL, output_type=RoutePlan,
     instructions=(
-        "You are the planner inside Super Muse. Split the user's request into "
+        "You are the planner inside Vyber. Split the user's request into "
         "subtasks for exactly these specialists: researcher (finds and "
         "synthesises information), builder (creates/changes files and code), "
         "data (answers questions from governed data, stating source and "

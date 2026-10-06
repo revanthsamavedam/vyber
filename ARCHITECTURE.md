@@ -1,9 +1,9 @@
-# Super Muse — architecture
+# Vyber — architecture
 
-One agent is a chatbot. Super Muse is a **team with a manager**:
+One agent is a chatbot. Vyber is a **team with a manager**:
 
 ```
-user ──► UI (React, separate repo: super-muse-ui) ──► API (this repo) ──► ORCHESTRATOR
+user ──► UI (React, separate repo: vyber-ui) ──► API (this repo) ──► ORCHESTRATOR
                                                     │ plan
                                               planner_agent → RoutePlan
                                                     │ delegate
@@ -26,11 +26,11 @@ user ──► UI (React, separate repo: super-muse-ui) ──► API (this repo
 3. **The reviewer builds nothing and approves reluctantly.** File plans are applied only after its verdict. A veto writes nothing and tells the user why.
 4. **Plans are suggestions.** Unknown agent names in a plan are normalised, file paths are contained to the workspace, and the validator of the real world (tests, compilers, humans) still gets the final say downstream.
 5. **Memory has a gate.** Episodes record themselves; curated facts require a named human approver.
-6. **The model is a commodity.** All agents read one env var (`SUPER_MODEL`). Swap providers without touching orchestration, skills, or UI.
+6. **The model is a commodity.** All agents read one env var (`VYBER_MODEL`). Swap providers without touching orchestration, skills, or UI.
 
 ## Where it came from
 
-Super Muse unifies the pieces built across its sibling templates:
+Vyber unifies the pieces built across its sibling templates:
 workplace-muse (agent + memory + approvals + MCP connectors) and
 vibe-paved-road (pattern skills + validator + studio). This repo is the
 personal, general-purpose edition: same bones, no employer patterns,

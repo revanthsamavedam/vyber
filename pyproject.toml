@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "super-muse"
+name = "vyber"
 version = "0.1.0"
-description = "Super Muse — a multi-agent personal work agent: a planner orchestrates specialist subagents (research, build, data, writing), a reviewer gates their work, with skills, 3-tier memory, approvals, and a full trace. Built on Pydantic AI; model is one env var."
+description = "Vyber — a multi-agent personal work agent: a planner orchestrates specialist subagents (research, build, data, writing), a reviewer gates their work, with skills, 3-tier memory, approvals, and a full trace. Built on Pydantic AI; model is one env var."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

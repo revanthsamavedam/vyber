@@ -1,7 +1,7 @@
 import asyncio
 import os
 
-os.environ.setdefault("SUPER_WORKSPACES", "/tmp/super-muse-test")
+os.environ.setdefault("VYBER_WORKSPACES", "/tmp/vyber-test")
 
 from core.orchestrator import Ctx, ask  # noqa: E402
 from core.schemas import KNOWN_AGENTS  # noqa: E402

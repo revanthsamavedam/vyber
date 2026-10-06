@@ -3,7 +3,7 @@
 Everything that used to live only in process memory (sessions, runs and
 their events, episodic + curated memory, approvals) is written through
 to this store, so a server restart loses nothing. The engine URL comes
-from SUPER_DATABASE_URL (default: sqlite file under SUPER_DATA_DIR);
+from VYBER_DATABASE_URL (default: sqlite file under VYBER_DATA_DIR);
 because it's SQLAlchemy, moving to Postgres later is a URL change plus
 a driver — the table definitions and call sites don't change.
 

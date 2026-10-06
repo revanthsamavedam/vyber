@@ -1,4 +1,4 @@
-"""Super Muse orchestrator — ask → plan → delegate → review → apply → report.
+"""Vyber orchestrator — ask → plan → delegate → review → apply → report.
 
 The orchestrator is deliberately thin code around the agents:
   1. planner_agent turns the request into a RoutePlan of subtasks.
@@ -18,7 +18,7 @@ from pathlib import Path
 
 from core.memory import Memory
 from core.schemas import (KNOWN_AGENTS, FilePlan, ReviewVerdict, Step,
-                          SuperResult)
+                          VyberResult)
 from core.subagents import SUBAGENTS, planner_agent, reviewer_agent
 from core.traces import TraceLog, new_trace_id
 from core.workspace import apply_changes
@@ -44,7 +44,7 @@ def _summarise(output) -> str:
     return f"{type(output).__name__} completed"
 
 
-async def ask(prompt: str, ctx: Ctx, emit=None) -> SuperResult:
+async def ask(prompt: str, ctx: Ctx, emit=None) -> VyberResult:
     """emit(kind, payload), if given, is called live as work happens:
     ("step", Step) for every step the moment it completes, and
     ("subagent.started", {agent, task}) before each delegation.
@@ -116,5 +116,5 @@ async def ask(prompt: str, ctx: Ctx, emit=None) -> SuperResult:
                    + "; ".join(review.issues) or review.summary)
     ctx.trace.emit(ctx.trace_id, "run.completed", {"changed": changed})
     ctx.memory.record(ctx.user_id, "run.completed", {"prompt": prompt[:120]})
-    return SuperResult(summary=summary, steps=steps,
+    return VyberResult(summary=summary, steps=steps,
                        changed_files=changed, review=review)

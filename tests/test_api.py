@@ -1,7 +1,7 @@
 import os
 
-os.environ.setdefault("SUPER_WORKSPACES", "/tmp/super-muse-test-studio")
-os.environ.setdefault("SUPER_DATA_DIR", "/tmp/super-muse-test-data")
+os.environ.setdefault("VYBER_WORKSPACES", "/tmp/vyber-test-studio")
+os.environ.setdefault("VYBER_DATA_DIR", "/tmp/vyber-test-data")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
@@ -24,7 +24,7 @@ def test_health_and_auth():
 
 def test_root_is_api_not_ui():
     body = client.get("/").json()
-    assert body["service"] == "super-muse-api"
+    assert body["service"] == "vyber-api"
 
 
 def test_cors_allows_the_react_ui_origin():
@@ -73,11 +73,11 @@ def test_runs_queue_and_queued_run_can_be_cancelled(monkeypatch):
     import asyncio as _asyncio
 
     import api.main as api_main
-    from core.schemas import SuperResult
+    from core.schemas import VyberResult
 
     async def slow_ask(prompt, ctx, emit=None):
         await _asyncio.sleep(1.0)
-        return SuperResult(summary="slow", steps=[])
+        return VyberResult(summary="slow", steps=[])
 
     monkeypatch.setattr(api_main, "ask", slow_ask)
     sid = _session()

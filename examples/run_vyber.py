@@ -1,6 +1,6 @@
 """CLI demo — one ask, full orchestration, no model key needed.
 
-    python -m examples.run_super "Research note-taking methods and build me a one-page guide"
+    python -m examples.run_vyber "Research note-taking methods and build me a one-page guide"
 """
 from __future__ import annotations
 

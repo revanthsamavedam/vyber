@@ -1,11 +1,11 @@
-"""Super Muse API — backend only. The UI lives in the separate
-super-muse-ui repo (React) and talks to this service over HTTP.
+"""Vyber API — backend only. The UI lives in the separate
+vyber-ui repo (React) and talks to this service over HTTP.
 
 Run:  uvicorn api.main:app --port 8091
 Auth is a demo stub (Bearer demo:<user>) where real SSO would sit.
-CORS: the UI's origin must be allowed — SUPER_CORS_ORIGINS is a
+CORS: the UI's origin must be allowed — VYBER_CORS_ORIGINS is a
 comma-separated list (default covers the local Vite dev/preview ports).
-Model: SUPER_MODEL env var — see core/models.py.
+Model: VYBER_MODEL env var — see core/models.py.
 """
 from __future__ import annotations
 
@@ -31,14 +31,19 @@ from core.traces import TraceLog
 from core.workspace import list_files
 
 # Persistence: everything stateful goes through the store, so a restart
-# loses nothing. SUPER_DATABASE_URL picks the database (SQLAlchemy —
-# sqlite by default, Postgres by URL); SUPER_DATA_DIR holds the sqlite
+# loses nothing. VYBER_DATABASE_URL picks the database (SQLAlchemy —
+# sqlite by default, Postgres by URL); VYBER_DATA_DIR holds the sqlite
 # file, traces, and workspaces.
-DATA = Path(os.environ.get("SUPER_DATA_DIR", Path.home() / ".super-muse"))
+def _env(new: str, old: str, default=None):
+    # VYBER_* is canonical; SUPER_* (pre-rename) still honored.
+    return os.environ.get(new) or os.environ.get(old) or default
+
+
+DATA = Path(_env("VYBER_DATA_DIR", "SUPER_DATA_DIR", Path.home() / ".vyber"))
 DATA.mkdir(parents=True, exist_ok=True)
-STORE = Store(os.environ.get("SUPER_DATABASE_URL",
-                             f"sqlite:///{DATA / 'super.db'}"))
-BASE = Path(os.environ.get("SUPER_WORKSPACES", DATA / "workspaces"))
+STORE = Store(_env("VYBER_DATABASE_URL", "SUPER_DATABASE_URL",
+                   f"sqlite:///{DATA / 'vyber.db'}"))
+BASE = Path(_env("VYBER_WORKSPACES", "SUPER_WORKSPACES", DATA / "workspaces"))
 BASE.mkdir(parents=True, exist_ok=True)
 MEMORY = Memory(_store=STORE)
 TRACE = TraceLog(path=str(DATA / "traces.jsonl"))
@@ -49,10 +54,10 @@ for _row in STORE.all_sessions():  # rehydrate sessions after a restart
     SESSIONS[_row["id"]] = Ctx(user_id=_row["user_id"], workspace=_ws,
                                memory=MEMORY, trace=TRACE)
 
-app = FastAPI(title="super-muse-api")
+app = FastAPI(title="vyber-api")
 
-_origins = [o.strip() for o in os.environ.get(
-    "SUPER_CORS_ORIGINS",
+_origins = [o.strip() for o in _env(
+    "VYBER_CORS_ORIGINS", "SUPER_CORS_ORIGINS",
     "http://localhost:5173,http://127.0.0.1:5173,"
     "http://localhost:4173,http://127.0.0.1:4173").split(",") if o.strip()]
 app.add_middleware(
@@ -73,8 +78,8 @@ async def auth_mw(request: Request, call_next):
 
 @app.get("/")
 def root():
-    return {"service": "super-muse-api", "model": get_model(),
-            "ui": "super-muse-ui (separate repo)"}
+    return {"service": "vyber-api", "model": get_model(),
+            "ui": "vyber-ui (separate repo)"}
 
 
 @app.get("/healthz")

@@ -56,7 +56,7 @@ class Step(BaseModel):
     kind: str = "task"  # task | review | apply | plan
 
 
-class SuperResult(BaseModel):
+class VyberResult(BaseModel):
     summary: str
     steps: list[Step] = Field(default_factory=list)
     changed_files: list[str] = Field(default_factory=list)
