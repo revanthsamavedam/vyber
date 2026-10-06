@@ -36,6 +36,8 @@ uvicorn api.main:app --port 8091        # backend API (this repo)
 
 **Chat is non-blocking:** `POST /api/chat` returns `202 {run_id}` immediately. Runs execute in the background — one at a time per session (a session's workspace is never written by two runs at once), extra messages queue. Watch a run live via `GET /api/runs/{id}/events` (SSE: status / subagent.started / step / result), poll `GET /api/runs/{id}`, or stop it with `POST /api/runs/{id}/cancel` (queued runs never start; a running run cancels at its next await point).
 
+**Persistence:** sessions, runs + events, episodic and curated memory, and approvals are stored in a database (`core/store.py`, SQLAlchemy) — restarts lose nothing, and a run that was mid-flight when the server died comes back marked `failed: interrupted`, never a zombie. Default is SQLite at `$SUPER_DATA_DIR/super.db` (data dir default `~/.super-muse`, which also holds `traces.jsonl` and the session workspaces); set `SUPER_DATABASE_URL` to move to Postgres — same code, different URL.
+
 ## The model is yours to plug in
 
 Everything runs with **no key** on Pydantic AI's TestModel — full pipeline,

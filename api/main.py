@@ -26,15 +26,28 @@ from api.runs import Run, RunManager
 from core.memory import Memory
 from core.models import get_model
 from core.orchestrator import Ctx, ask
+from core.store import Store
 from core.traces import TraceLog
 from core.workspace import list_files
 
-BASE = Path(os.environ.get("SUPER_WORKSPACES",
-                           Path(tempfile.gettempdir()) / "super-muse-workspaces"))
+# Persistence: everything stateful goes through the store, so a restart
+# loses nothing. SUPER_DATABASE_URL picks the database (SQLAlchemy —
+# sqlite by default, Postgres by URL); SUPER_DATA_DIR holds the sqlite
+# file, traces, and workspaces.
+DATA = Path(os.environ.get("SUPER_DATA_DIR", Path.home() / ".super-muse"))
+DATA.mkdir(parents=True, exist_ok=True)
+STORE = Store(os.environ.get("SUPER_DATABASE_URL",
+                             f"sqlite:///{DATA / 'super.db'}"))
+BASE = Path(os.environ.get("SUPER_WORKSPACES", DATA / "workspaces"))
 BASE.mkdir(parents=True, exist_ok=True)
+MEMORY = Memory(_store=STORE)
+TRACE = TraceLog(path=str(DATA / "traces.jsonl"))
 SESSIONS: dict[str, Ctx] = {}
-MEMORY = Memory()
-TRACE = TraceLog()
+for _row in STORE.all_sessions():  # rehydrate sessions after a restart
+    _ws = Path(_row["workspace"])
+    _ws.mkdir(parents=True, exist_ok=True)
+    SESSIONS[_row["id"]] = Ctx(user_id=_row["user_id"], workspace=_ws,
+                               memory=MEMORY, trace=TRACE)
 
 app = FastAPI(title="super-muse-api")
 
@@ -79,6 +92,7 @@ def create_session(body: SessionIn, request: Request):
     ctx = Ctx(user_id=body.user or request.state.caller,
               workspace=BASE / sid, memory=MEMORY, trace=TRACE)
     SESSIONS[sid] = ctx
+    STORE.save_session(sid, ctx.user_id, str(ctx.workspace))
     return {"session_id": sid, "model": get_model(), "files": []}
 
 
@@ -102,7 +116,7 @@ async def _execute(run: Run) -> dict:
             "trace_events": [e["kind"] for e in TRACE.events(ctx.trace_id)]}
 
 
-MANAGER = RunManager(_execute)
+MANAGER = RunManager(_execute, store=STORE)
 
 
 @app.post("/api/chat", status_code=202)

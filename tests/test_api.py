@@ -1,6 +1,7 @@
 import os
 
 os.environ.setdefault("SUPER_WORKSPACES", "/tmp/super-muse-test-studio")
+os.environ.setdefault("SUPER_DATA_DIR", "/tmp/super-muse-test-data")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
