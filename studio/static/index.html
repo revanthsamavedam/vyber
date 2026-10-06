@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Super Muse</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, sans-serif; height: 100vh; display: flex; flex-direction: column; }
+  header { padding: .6rem 1rem; background: #1d1b2e; color: #fff; display: flex; gap: 1rem; align-items: baseline; }
+  header .sub { color: #c9c4e8; font-size: .85rem; }
+  main { flex: 1; display: grid; grid-template-columns: 1fr 24rem; min-height: 0; }
+  #chatpane { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid #ddd; }
+  #log { flex: 1; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: .6rem; }
+  .msg { padding: .6rem .8rem; border-radius: .7rem; white-space: pre-wrap; line-height: 1.4; max-width: 92%; }
+  .user { background: #e6e2fb; align-self: flex-end; }
+  .assistant { background: #f3f3f0; align-self: flex-start; }
+  form { display: flex; gap: .5rem; padding: .7rem; border-top: 1px solid #ddd; }
+  input[type=text] { flex: 1; padding: .55rem; font-size: 1rem; }
+  button { padding: .55rem 1rem; font-size: 1rem; cursor: pointer; }
+  #side { padding: 1rem; overflow-y: auto; background: #faf9f6; }
+  #side h3 { margin: .8rem 0 .4rem; font-size: .95rem; }
+  .step { border-left: 3px solid #6c5ce7; padding: .3rem .6rem; margin: .35rem 0; background: #fff; font-size: .88rem; }
+  .step b { text-transform: capitalize; }
+  .kind { color: #777; font-size: .78rem; }
+  pre { white-space: pre-wrap; font-size: .82rem; }
+  @media (max-width: 800px) { main { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header><strong>Super Muse</strong><span class="sub">One ask → a planner delegates to specialists → a reviewer gates anything written. Model: <span id="model">—</span></span></header>
+<main>
+  <section id="chatpane">
+    <div id="log"></div>
+    <form id="composer">
+      <input type="text" id="text" placeholder="Ask for research, a draft, data, or something built…" autocomplete="off">
+      <button type="submit">Send</button>
+    </form>
+  </section>
+  <aside id="side">
+    <h3>Agent trace</h3>
+    <div id="steps"><i>No runs yet.</i></div>
+    <h3>Workspace files</h3>
+    <pre id="files">—</pre>
+    <h3>Review</h3>
+    <pre id="review">—</pre>
+  </aside>
+</main>
+<script>
+const AUTH = { "Authorization": "Bearer demo:alice", "Content-Type": "application/json" };
+let sessionId = null;
+const log = document.getElementById("log");
+function bubble(role, text) {
+  const d = document.createElement("div");
+  d.className = "msg " + role; d.textContent = text;
+  log.appendChild(d); log.scrollTop = log.scrollHeight;
+}
+async function start() {
+  const r = await fetch("/api/session", { method: "POST", headers: AUTH, body: JSON.stringify({ user: "alice" }) });
+  const st = await r.json();
+  sessionId = st.session_id;
+  document.getElementById("model").textContent = st.model;
+  bubble("assistant", "I'm Super Muse. One request is enough — I'll plan it, hand parts to my researcher / builder / data / writer specialists, and have a reviewer check anything before it's written to your workspace. Try me.");
+}
+start();
+document.getElementById("composer").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const input = document.getElementById("text");
+  const text = input.value.trim(); if (!text) return;
+  input.value = "";
+  bubble("user", text);
+  bubble("assistant", "Planning and delegating…");
+  const r = await fetch("/api/chat", { method: "POST", headers: AUTH,
+    body: JSON.stringify({ session_id: sessionId, message: text }) });
+  const out = await r.json();
+  log.lastChild.textContent = out.summary || JSON.stringify(out);
+  document.getElementById("steps").innerHTML = (out.steps || []).map(s =>
+    '<div class="step"><b>' + s.agent + '</b> <span class="kind">' + s.kind + '</span><br>' +
+    s.task + '<br><i>' + s.output + '</i></div>').join("") || "<i>No steps.</i>";
+  document.getElementById("files").textContent = (out.files || []).join("\n") || "—";
+  document.getElementById("review").textContent = out.review ? JSON.stringify(out.review, null, 2) : "No file plan to review.";
+});
+</script>
+</body>
+</html>

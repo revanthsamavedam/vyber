@@ -1,0 +1,10 @@
+.venv/
+*.egg-info/
+__pycache__/
+*.pyc
+.env
+.env.*
+!.env.example
+workspaces/
+traces/*.jsonl
+.DS_Store
