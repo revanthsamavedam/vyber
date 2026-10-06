@@ -29,8 +29,10 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 pytest -q
 python -m examples.run_super "Research deep work and build me a one-page guide"
-uvicorn studio.main:app --port 8091     # browser studio: chat + live agent trace
+uvicorn api.main:app --port 8091        # backend API (this repo)
 ```
+
+**UI is a separate repo:** [super-muse-ui](https://github.com/revanthsamavedam/super-muse-ui) (React + Vite). Clone it, `npm install && npm run dev`, and it talks to this API on :8091 (CORS preconfigured for the Vite ports; override with `SUPER_CORS_ORIGINS`).
 
 ## The model is yours to plug in
 
@@ -38,7 +40,7 @@ Everything runs with **no key** on Pydantic AI's TestModel — full pipeline,
 placeholder content. Set one variable to make it real:
 
 ```bash
-SUPER_MODEL="openai:gpt-5" uvicorn studio.main:app --port 8091
+SUPER_MODEL="openai:gpt-5" uvicorn api.main:app --port 8091
 # any Pydantic AI model string works: azure:, anthropic:, your gateway…
 ```
 

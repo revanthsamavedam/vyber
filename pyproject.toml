@@ -21,4 +21,4 @@ testpaths = ["tests"]
 pythonpath = ["."]
 
 [tool.setuptools.packages.find]
-include = ["core*", "studio*"]
+include = ["core*", "api*"]

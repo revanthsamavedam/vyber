@@ -3,7 +3,7 @@
 One agent is a chatbot. Super Muse is a **team with a manager**:
 
 ```
-user ──► STUDIO (browser chat + trace panel) ──► ORCHESTRATOR
+user ──► UI (React, separate repo: super-muse-ui) ──► API (this repo) ──► ORCHESTRATOR
                                                     │ plan
                                               planner_agent → RoutePlan
                                                     │ delegate

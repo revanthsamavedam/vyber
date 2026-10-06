@@ -1,7 +1,10 @@
-"""Super Muse studio — browser chat with the agent trace made visible.
+"""Super Muse API — backend only. The UI lives in the separate
+super-muse-ui repo (React) and talks to this service over HTTP.
 
-Run:  uvicorn studio.main:app --port 8091  →  http://localhost:8091
+Run:  uvicorn api.main:app --port 8091
 Auth is a demo stub (Bearer demo:<user>) where real SSO would sit.
+CORS: the UI's origin must be allowed — SUPER_CORS_ORIGINS is a
+comma-separated list (default covers the local Vite dev/preview ports).
 Model: SUPER_MODEL env var — see core/models.py.
 """
 from __future__ import annotations
@@ -12,7 +15,8 @@ import uuid
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from core.memory import Memory
@@ -24,18 +28,24 @@ from core.workspace import list_files
 BASE = Path(os.environ.get("SUPER_WORKSPACES",
                            Path(tempfile.gettempdir()) / "super-muse-workspaces"))
 BASE.mkdir(parents=True, exist_ok=True)
-STATIC = Path(__file__).parent / "static"
 SESSIONS: dict[str, Ctx] = {}
 MEMORY = Memory()
 TRACE = TraceLog()
 
-app = FastAPI(title="super-muse")
-OPEN_EXACT = ("/", "/healthz", "/favicon.ico")
+app = FastAPI(title="super-muse-api")
+
+_origins = [o.strip() for o in os.environ.get(
+    "SUPER_CORS_ORIGINS",
+    "http://localhost:5173,http://127.0.0.1:5173,"
+    "http://localhost:4173,http://127.0.0.1:4173").split(",") if o.strip()]
+app.add_middleware(
+    CORSMiddleware, allow_origins=_origins, allow_methods=["*"],
+    allow_headers=["*"])
 
 
 @app.middleware("http")
 async def auth_mw(request: Request, call_next):
-    if request.url.path in OPEN_EXACT:
+    if request.url.path in ("/", "/healthz") or request.method == "OPTIONS":
         return await call_next(request)
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer demo:"):
@@ -44,14 +54,15 @@ async def auth_mw(request: Request, call_next):
     return await call_next(request)
 
 
+@app.get("/")
+def root():
+    return {"service": "super-muse-api", "model": get_model(),
+            "ui": "super-muse-ui (separate repo)"}
+
+
 @app.get("/healthz")
 def healthz():
     return {"ok": True, "model": get_model()}
-
-
-@app.get("/")
-def index():
-    return FileResponse(STATIC / "index.html")
 
 
 class SessionIn(BaseModel):

@@ -4,7 +4,7 @@ os.environ.setdefault("SUPER_WORKSPACES", "/tmp/super-muse-test-studio")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from studio.main import app  # noqa: E402
+from api.main import app  # noqa: E402
 
 client = TestClient(app, raise_server_exceptions=False)
 AUTH = {"Authorization": "Bearer demo:alice"}
@@ -13,6 +13,19 @@ AUTH = {"Authorization": "Bearer demo:alice"}
 def test_health_and_auth():
     assert client.get("/healthz").json()["model"]
     assert client.post("/api/session", json={"user": "alice"}).status_code == 401
+
+
+def test_root_is_api_not_ui():
+    body = client.get("/").json()
+    assert body["service"] == "super-muse-api"
+
+
+def test_cors_allows_the_react_ui_origin():
+    r = client.options("/api/session", headers={
+        "Origin": "http://localhost:5173",
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "authorization,content-type"})
+    assert r.headers.get("access-control-allow-origin") == "http://localhost:5173"
 
 
 def test_chat_flow_shows_trace():
