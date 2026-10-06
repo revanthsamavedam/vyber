@@ -34,6 +34,8 @@ uvicorn api.main:app --port 8091        # backend API (this repo)
 
 **UI is a separate repo:** [super-muse-ui](https://github.com/revanthsamavedam/super-muse-ui) (React + Vite). Clone it, `npm install && npm run dev`, and it talks to this API on :8091 (CORS preconfigured for the Vite ports; override with `SUPER_CORS_ORIGINS`).
 
+**Chat is non-blocking:** `POST /api/chat` returns `202 {run_id}` immediately. Runs execute in the background — one at a time per session (a session's workspace is never written by two runs at once), extra messages queue. Watch a run live via `GET /api/runs/{id}/events` (SSE: status / subagent.started / step / result), poll `GET /api/runs/{id}`, or stop it with `POST /api/runs/{id}/cancel` (queued runs never start; a running run cancels at its next await point).
+
 ## The model is yours to plug in
 
 Everything runs with **no key** on Pydantic AI's TestModel — full pipeline,

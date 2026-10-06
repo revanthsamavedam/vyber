@@ -13,6 +13,15 @@ def test_subagent_roster():
         "researcher", "builder", "data", "writer"}
 
 
+def test_orchestrator_emits_live_events(tmp_path):
+    seen = []
+    ctx = Ctx(user_id="alice", workspace=tmp_path / "ws")
+    asyncio.run(ask("Research something", ctx,
+                    emit=lambda kind, payload: seen.append(kind)))
+    assert seen[0] == "step"                      # planner step lands first
+    assert "subagent.started" in seen and "step" in seen[1:]
+
+
 def test_orchestrator_runs_end_to_end(tmp_path):
     ctx = Ctx(user_id="alice", workspace=tmp_path / "ws")
     result = asyncio.run(ask("Research deep work and build me a short guide", ctx))

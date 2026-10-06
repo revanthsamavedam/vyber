@@ -44,7 +44,15 @@ def _summarise(output) -> str:
     return f"{type(output).__name__} completed"
 
 
-async def ask(prompt: str, ctx: Ctx) -> SuperResult:
+async def ask(prompt: str, ctx: Ctx, emit=None) -> SuperResult:
+    """emit(kind, payload), if given, is called live as work happens:
+    ("step", Step) for every step the moment it completes, and
+    ("subagent.started", {agent, task}) before each delegation.
+    The API layer uses it to stream the activity view; the CLI ignores it."""
+    def _emit(kind, payload):
+        if emit is not None:
+            emit(kind, payload)
+
     ctx.trace.emit(ctx.trace_id, "run.started", {"user": ctx.user_id})
     steps: list[Step] = []
 
@@ -62,15 +70,18 @@ async def ask(prompt: str, ctx: Ctx) -> SuperResult:
                       kind="plan"))
     ctx.trace.emit(ctx.trace_id, "plan.created",
                    {"tasks": [t.agent for t in plan.tasks]})
+    _emit("step", steps[-1])
 
     file_plans: list[FilePlan] = []
     for sub in plan.tasks:
         name = sub.agent if sub.agent in KNOWN_AGENTS else "researcher"
         agent = SUBAGENTS[name]
+        _emit("subagent.started", {"agent": name, "task": sub.task})
         result = await agent.run(sub.task)
         out = result.output
         steps.append(Step(agent=name, task=sub.task, output=_summarise(out)))
         ctx.trace.emit(ctx.trace_id, "subagent.done", {"agent": name})
+        _emit("step", steps[-1])
         if isinstance(out, FilePlan):
             file_plans.append(out)
         ctx.memory.record(ctx.user_id, "subagent.done",
@@ -90,10 +101,12 @@ async def ask(prompt: str, ctx: Ctx) -> SuperResult:
                                  ("approved" if review.approved else "vetoed"),
                           kind="review"))
         ctx.trace.emit(ctx.trace_id, "review.done", {"approved": review.approved})
+        _emit("step", steps[-1])
         if review.approved:
             changed = apply_changes(ctx.workspace, merged.files)
             steps.append(Step(agent="orchestrator", task="apply file plan",
                               output=f"{len(changed)} file(s) written", kind="apply"))
+            _emit("step", steps[-1])
         # veto: write nothing; the caller surfaces review.issues
 
     summary_bits = [s.output for s in steps if s.kind == "task" and s.output]

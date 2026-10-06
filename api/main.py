@@ -14,11 +14,15 @@ import tempfile
 import uuid
 from pathlib import Path
 
+import asyncio
+import json
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
+from api.runs import Run, RunManager
 from core.memory import Memory
 from core.models import get_model
 from core.orchestrator import Ctx, ask
@@ -83,12 +87,77 @@ class ChatIn(BaseModel):
     message: str
 
 
-@app.post("/api/chat")
-async def chat(body: ChatIn):
-    ctx = SESSIONS.get(body.session_id)
-    if ctx is None:
-        raise HTTPException(404, "unknown session")
-    result = await ask(body.message, ctx)
+async def _execute(run: Run) -> dict:
+    ctx = SESSIONS[run.session_id]
+
+    def emit(kind, payload):
+        if kind == "step":
+            run.publish({"type": "step", "step": payload.model_dump()})
+        elif kind == "subagent.started":
+            run.publish({"type": "subagent.started", **payload})
+
+    result = await ask(run.prompt, ctx, emit=emit)
     return {**result.model_dump(),
             "files": list_files(ctx.workspace),
             "trace_events": [e["kind"] for e in TRACE.events(ctx.trace_id)]}
+
+
+MANAGER = RunManager(_execute)
+
+
+@app.post("/api/chat", status_code=202)
+async def chat(body: ChatIn):
+    """Non-blocking: returns a run immediately. Watch it via
+    GET /api/runs/{id}/events (SSE) or poll GET /api/runs/{id}."""
+    if body.session_id not in SESSIONS:
+        raise HTTPException(404, "unknown session")
+    run = MANAGER.submit(body.session_id, body.message)
+    return {"run_id": run.id, "status": run.status}
+
+
+def _run_view(run: Run) -> dict:
+    return {"run_id": run.id, "session_id": run.session_id, "prompt": run.prompt,
+            "status": run.status, "result": run.result, "error": run.error,
+            "events": run.events}
+
+
+@app.get("/api/runs/{run_id}")
+def get_run(run_id: str):
+    run = MANAGER.get(run_id)
+    if run is None:
+        raise HTTPException(404, "unknown run")
+    return _run_view(run)
+
+
+@app.post("/api/runs/{run_id}/cancel")
+def cancel_run(run_id: str):
+    run = MANAGER.cancel(run_id)
+    if run is None:
+        raise HTTPException(404, "unknown run")
+    return {"run_id": run.id, "status": run.status}
+
+
+@app.get("/api/runs/{run_id}/events")
+async def run_events(run_id: str):
+    run = MANAGER.get(run_id)
+    if run is None:
+        raise HTTPException(404, "unknown run")
+
+    async def gen():
+        q = run.subscribe()
+        try:
+            while True:
+                event = await q.get()
+                yield f"data: {json.dumps(event)}\n\n"
+                if event.get("type") in ("result", "error") or (
+                        event.get("type") == "status"
+                        and event.get("status") in ("cancelled",)):
+                    break
+                if run.status in ("done", "failed", "cancelled") and q.empty():
+                    break
+        except asyncio.CancelledError:
+            pass
+        finally:
+            run.unsubscribe(q)
+
+    return StreamingResponse(gen(), media_type="text/event-stream")
