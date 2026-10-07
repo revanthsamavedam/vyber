@@ -14,6 +14,6 @@ RUN pip install --no-cache-dir -e .
 # host directory or volume there; the container itself is disposable.
 ENV VYBER_DATA_DIR=/data
 EXPOSE 8091
-HEALTHCHECK --interval=30s --timeout=5s \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8091/healthz')" || exit 1
 CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8091"]

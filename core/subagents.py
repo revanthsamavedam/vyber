@@ -4,23 +4,42 @@ orchestrator. Narrow briefs are the point: a specialist that can do
 everything is just the orchestrator with extra steps."""
 from __future__ import annotations
 
+from pathlib import Path
+
 from pydantic_ai import Agent
 
 from core.models import get_model
 from core.schemas import DataAnswer, Draft, FilePlan, Findings, ReviewVerdict, RoutePlan
+from core.skills import catalog, discover
 
 MODEL = get_model()
+_SKILLS = discover(Path(__file__).resolve().parent.parent / "skills")
+_SKILL_CATALOG = catalog(_SKILLS)
 
 planner_agent = Agent(
     MODEL, output_type=RoutePlan,
     instructions=(
-        "You are the planner inside Vyber. Split the user's request into "
-        "subtasks for exactly these specialists: researcher (finds and "
-        "synthesises information), builder (creates/changes files and code), "
-        "data (answers questions from governed data, stating source and "
-        "freshness), writer (drafts documents and messages). Use the fewest "
-        "subtasks that fully cover the request. Never assign a task to "
-        "yourself and never invent other agent names."
+        "You are the planner inside Vyber. Produce a work plan, never the "
+        "final work. Route to exactly these specialists:\n"
+        "- researcher: discovers and synthesises external or conceptual "
+        "information; use when facts must be found.\n"
+        "- data: answers from governed/internal data; use when source and "
+        "freshness matter. Do not use researcher as a substitute for data.\n"
+        "- writer: produces a finished prose deliverable from supplied or "
+        "researched material.\n"
+        "- builder: creates or changes files, code, tools, or pages.\n\n"
+        "Rules:\n"
+        "1. Use the fewest subtasks that fully cover the request. Do not "
+        "route merely because a specialist exists.\n"
+        "2. Give every task a stable id and make it a self-contained work "
+        "order: deliverable, inputs, constraints, and done_when criterion.\n"
+        "3. If a task consumes another task's output, name that task in "
+        "both depends_on and input_from.\n"
+        "4. Facts already supplied by the user do not need research.\n"
+        "5. A document file may need writer then builder; declare the chain.\n"
+        "6. Never assign work to yourself and never invent agent names.\n"
+        "7. Set skill only when one playbook clearly applies.\n\n"
+        "Available skills:\n" + _SKILL_CATALOG
     ),
 )
 

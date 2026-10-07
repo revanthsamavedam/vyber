@@ -15,7 +15,8 @@ import json
 import time
 
 from sqlalchemy import (Column, Float, Integer, MetaData, String, Table,
-                        create_engine, delete, insert, select, update)
+                        create_engine, delete, event, insert, select, text,
+                        update)
 
 meta = MetaData()
 
@@ -75,7 +76,23 @@ class Store:
     def __init__(self, url: str):
         connect_args = {"check_same_thread": False} if url.startswith("sqlite") else {}
         self.engine = create_engine(url, connect_args=connect_args)
+        if url.startswith("sqlite"):
+            @event.listens_for(self.engine, "connect")
+            def _sqlite_pragmas(dbapi_connection, _record):
+                cursor = dbapi_connection.cursor()
+                cursor.execute("PRAGMA journal_mode=WAL")
+                cursor.execute("PRAGMA foreign_keys=ON")
+                cursor.execute("PRAGMA busy_timeout=5000")
+                cursor.close()
         meta.create_all(self.engine)
+
+    def ping(self) -> bool:
+        try:
+            with self.engine.connect() as c:
+                c.execute(text("SELECT 1"))
+            return True
+        except Exception:
+            return False
 
     # -- sessions ------------------------------------------------------
     def save_session(self, sid: str, user_id: str, workspace: str) -> None:

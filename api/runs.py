@@ -18,11 +18,18 @@ not interrupted mid-flight, and the run is marked cancelled either way.
 from __future__ import annotations
 
 import asyncio
+import time
 import uuid
 from dataclasses import dataclass, field
 from typing import Awaitable, Callable
 
+from core.config import SETTINGS
+
 TERMINAL = ("done", "failed", "cancelled")
+
+
+class QueueFullError(RuntimeError):
+    pass
 
 
 @dataclass
@@ -31,6 +38,7 @@ class Run:
     session_id: str
     prompt: str
     status: str = "queued"
+    created_at: float = field(default_factory=time.time)
     events: list[dict] = field(default_factory=list)
     result: dict | None = None
     error: str | None = None
@@ -81,6 +89,7 @@ class RunManager:
         for row in self._store.list_runs():
             run = Run(id=row["id"], session_id=row["session_id"],
                       prompt=row["prompt"], status=row["status"],
+                      created_at=row["created_at"],
                       result=row["result"], error=row["error"],
                       events=self._store.events_for(row["id"]),
                       _store=self._store)
@@ -91,6 +100,11 @@ class RunManager:
             self.runs[run.id] = run
 
     def submit(self, session_id: str, prompt: str) -> Run:
+        active = [r for r in self.runs.values()
+                  if r.session_id == session_id and r.status not in TERMINAL]
+        if len(active) >= SETTINGS.max_queued_runs_per_session:
+            raise QueueFullError(
+                f"session already has {len(active)} queued or running runs")
         run = Run(id=uuid.uuid4().hex[:12], session_id=session_id,
                   prompt=prompt, _store=self._store)
         self.runs[run.id] = run
@@ -137,3 +151,8 @@ class RunManager:
 
     def get(self, run_id: str) -> Run | None:
         return self.runs.get(run_id)
+
+    def runs_for_session(self, session_id: str) -> list[Run]:
+        return sorted(
+            (r for r in self.runs.values() if r.session_id == session_id),
+            key=lambda r: r.created_at)

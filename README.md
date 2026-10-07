@@ -50,3 +50,23 @@ VYBER_MODEL="openai:gpt-5" uvicorn api.main:app --port 8091
 
 That env var (`core/models.py`) is the entire model integration — every
 agent in the system reads it, nothing else names a model.
+
+## Production quality
+
+Read **[PRODUCTION.md](PRODUCTION.md)** for what is implemented and what
+must still be configured before real users. The routing layer now uses a
+validated task DAG: specialists receive only declared upstream outputs,
+independent tasks run in parallel, file application stays serial, and
+plans are checked for invalid dependencies, cycles, excess size, and
+skill/agent mismatches before any specialist is called.
+
+Routing changes are measured, not vibes:
+
+```bash
+VYBER_MODEL="azure:<deployment>" \
+  python -m evals.run_routing_evals --repeat 3 --fail-under 0.8
+```
+
+The 18-case suite reports acceptable-route, forbidden-route,
+missing/extra-agent, dependency, and completion-criterion metrics.
+Without `VYBER_MODEL`, it runs on TestModel and measures plumbing only.

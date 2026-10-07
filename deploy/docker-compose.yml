@@ -18,6 +18,14 @@ services:
       - ${VYBER_HOST_DATA:-/home/ec2-user/vyber-data}:/data
     ports:
       - "127.0.0.1:8091:8091"   # host-local only; the world talks to the UI
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     restart: unless-stopped
 
   ui:
@@ -26,7 +34,16 @@ services:
       dockerfile: Dockerfile
     image: vyber-ui
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     ports:
       - "80:80"
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     restart: unless-stopped

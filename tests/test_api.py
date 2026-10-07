@@ -15,11 +15,27 @@ _cm = TestClient(app, raise_server_exceptions=False)
 client = _cm.__enter__()
 atexit.register(_cm.__exit__, None, None, None)
 AUTH = {"Authorization": "Bearer demo:alice"}
+BOB = {"Authorization": "Bearer " + "demo:bob"}
 
 
 def test_health_and_auth():
     assert client.get("/healthz").json()["model"]
     assert client.post("/api/session", json={"user": "alice"}).status_code == 401
+
+
+def test_readiness_checks_database_and_workspace():
+    body = client.get("/readyz").json()
+    assert body["ready"] and body["database"] and body["workspaces"]
+
+
+def test_session_ownership_and_validation():
+    sid = _session()
+    assert client.get(f"/api/session/{sid}", headers=BOB).status_code == 404
+    assert client.post("/api/chat", json={
+        "session_id": sid, "message": "hello"}, headers=BOB).status_code == 404
+    assert client.post("/api/chat", json={
+        "session_id": sid, "message": "x" * 20001}, headers=AUTH).status_code == 422
+    assert client.get(f"/api/sessions/{sid}/runs", headers=AUTH).status_code == 200
 
 
 def test_root_is_api_not_ui():
