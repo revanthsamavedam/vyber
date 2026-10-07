@@ -1,0 +1,32 @@
+# Vyber on one box (EC2 or local). Layout assumed — the two repos cloned
+# side by side, this file run from vyber/deploy/:
+#   ~/vyber/          (this repo)
+#   ~/vyber-ui/       (sibling checkout)
+# State lives in ONE host directory (VYBER_HOST_DATA in .env) mounted at
+# /data in the API container: sqlite db, session workspaces, traces.
+# Containers are disposable; the data dir is the product.
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: vyber-api
+    env_file: .env
+    environment:
+      VYBER_DATA_DIR: /data
+    volumes:
+      - ${VYBER_HOST_DATA:-/home/ec2-user/vyber-data}:/data
+    ports:
+      - "127.0.0.1:8091:8091"   # host-local only; the world talks to the UI
+    restart: unless-stopped
+
+  ui:
+    build:
+      context: ../../vyber-ui
+      dockerfile: Dockerfile
+    image: vyber-ui
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+    restart: unless-stopped
