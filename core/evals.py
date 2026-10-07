@@ -7,29 +7,22 @@ broken dependencies, and tasks without completion criteria.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from pydantic import BaseModel, Field
 
 from core.schemas import RoutePlan
 
 
-@dataclass
-class RoutingCase:
+class RoutingCase(BaseModel):
     name: str
     prompt: str
     acceptable: list[set[str]]
-    forbidden: set[str] = field(default_factory=set)
-    required_dependencies: list[tuple[str, str]] = field(default_factory=list)
+    forbidden: set[str] = Field(default_factory=set)
+    required_dependencies: list[tuple[str, str]] = Field(default_factory=list)
 
     @classmethod
     def from_dict(cls, data: dict) -> "RoutingCase":
-        return cls(
-            name=data["name"],
-            prompt=data["prompt"],
-            acceptable=[set(agents) for agents in data["acceptable"]],
-            forbidden=set(data.get("forbidden", [])),
-            required_dependencies=[tuple(pair) for pair in
-                                   data.get("required_dependencies", [])],
-        )
+        # JSON gives lists; Pydantic coerces them to the sets/tuples above.
+        return cls.model_validate(data)
 
 
 def _best_acceptable(case: RoutingCase, predicted: set[str]) -> set[str]:

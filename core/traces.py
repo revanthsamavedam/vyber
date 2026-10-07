@@ -5,17 +5,17 @@ from __future__ import annotations
 import json
 import time
 import uuid
-from dataclasses import dataclass, field
+
+from pydantic import BaseModel, PrivateAttr
 
 
 def new_trace_id() -> str:
     return uuid.uuid4().hex[:16]
 
 
-@dataclass
-class TraceLog:
+class TraceLog(BaseModel):
     path: str | None = None
-    _events: list[dict] = field(default_factory=list)
+    _events: list[dict] = PrivateAttr(default_factory=list)
 
     def emit(self, trace_id: str, kind: str, data: dict) -> None:
         evt = {"trace_id": trace_id, "kind": kind, "ts": time.time(), **data}

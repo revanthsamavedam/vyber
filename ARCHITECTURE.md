@@ -32,6 +32,7 @@ user ──► UI (React, separate repo: vyber-ui) ──► API (this repo) ─
 4. **Plans are suggestions until code validates them.** Agent names are schema-typed; task ids, skills, dependencies, cycles, and plan size are checked deterministically. Defects are recorded on the result instead of hidden. File paths are contained to the workspace, duplicate-path conflicts are vetoed, and the validator of the real world (tests, compilers, humans) still gets the final say downstream.
 5. **Memory has a gate.** Episodes record themselves; curated facts require a named human approver.
 6. **The model is a commodity.** All agents read one env var (`VYBER_MODEL`). Swap providers without touching orchestration, skills, or UI.
+7. **Pydantic models for all data.** Every data structure — agent schemas, settings, approval items, memory, run state, routing/eval cases — is a Pydantic model with validation at construction. Plain classes exist only as services (the SQLAlchemy store, the run manager), and they hold models, never loose dicts of domain data. (Boundary payloads — JSON reports, HTTP responses, SQL rows — stay dicts at the edge and are validated into models on the way in.)
 
 ## Where it came from
 

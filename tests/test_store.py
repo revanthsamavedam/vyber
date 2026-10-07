@@ -32,7 +32,7 @@ def test_approvals_survive_reopen(tmp_path):
 
     a2 = ApprovalStore(_store=Store(url))
     assert a2.is_approved(aid)
-    assert [p["id"] for p in a2.pending()] == [keep]
+    assert [p.id for p in a2.pending()] == [keep]
 
 
 def test_runs_survive_reopen_with_events(tmp_path):

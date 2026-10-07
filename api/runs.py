@@ -20,8 +20,9 @@ from __future__ import annotations
 import asyncio
 import time
 import uuid
-from dataclasses import dataclass, field
 from typing import Awaitable, Callable
+
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
 from core.config import SETTINGS
 
@@ -32,23 +33,30 @@ class QueueFullError(RuntimeError):
     pass
 
 
-@dataclass
-class Run:
+class Run(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     id: str
     session_id: str
     prompt: str
     status: str = "queued"
-    created_at: float = field(default_factory=time.time)
-    events: list[dict] = field(default_factory=list)
+    created_at: float = Field(default_factory=time.time)
+    events: list[dict] = Field(default_factory=list)
     result: dict | None = None
     error: str | None = None
-    _subs: list[asyncio.Queue] = field(default_factory=list)
-    _task: asyncio.Task | None = None
-    _store: object = field(default=None, repr=False)
+    _subs: list[asyncio.Queue] = PrivateAttr(default_factory=list)
+    _task: asyncio.Task | None = PrivateAttr(default=None)
+    _store: object = PrivateAttr(default=None)
     # Caller's bearer token, captured at submit time for on-behalf-of
     # forwarding during execution. Runtime-only: never written to the
     # store, never included in run views or events.
-    _auth_token: str | None = field(default=None, repr=False)
+    _auth_token: str | None = PrivateAttr(default=None)
+
+    def __init__(self, _store=None, _auth_token=None, **data):
+        super().__init__(**data)
+        # See Memory.__init__: private kwargs are taken explicitly.
+        self._store = _store
+        self._auth_token = _auth_token
 
     def publish(self, event: dict) -> None:
         self.events.append(event)

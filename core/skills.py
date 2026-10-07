@@ -2,12 +2,12 @@
 description) is cheap and goes in prompts; bodies load on demand."""
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 
+from pydantic import BaseModel
 
-@dataclass
-class Skill:
+
+class Skill(BaseModel):
     name: str
     description: str
     path: Path
@@ -30,7 +30,7 @@ def discover(skills_dir: str | Path) -> list[Skill]:
                         name = v.strip()
                     elif k.strip() == "description":
                         desc = v.strip()
-        out.append(Skill(name, desc, md))
+        out.append(Skill(name=name, description=desc, path=md))
     return out
 
 

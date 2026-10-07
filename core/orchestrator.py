@@ -16,10 +16,9 @@ The planner proposes; deterministic code disposes:
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass, field
 from pathlib import Path
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 from core.config import SETTINGS
 from core.memory import Memory
@@ -35,19 +34,20 @@ _SKILLS_DIR = Path(__file__).resolve().parent.parent / "skills"
 _SKILLS = {skill.name: skill for skill in discover(_SKILLS_DIR)}
 
 
-@dataclass
-class Ctx:
+class Ctx(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     user_id: str
     workspace: Path
-    memory: Memory = field(default_factory=Memory)
-    trace: TraceLog = field(default_factory=TraceLog)
-    trace_id: str = field(default_factory=new_trace_id)
+    memory: Memory = Field(default_factory=Memory)
+    trace: TraceLog = Field(default_factory=TraceLog)
+    trace_id: str = Field(default_factory=new_trace_id)
     # The caller's bearer token for THIS run, set by the API layer at
     # execution time. Runtime-only: never persisted, never traced, and
     # never placed in a prompt. It exists so tool/MCP calls made by
     # subagents can forward it on-behalf-of the user to services that
     # authorize the token themselves.
-    auth_token: str | None = field(default=None, repr=False)
+    auth_token: str | None = Field(default=None, repr=False)
 
 
 def _summarise(output) -> str:

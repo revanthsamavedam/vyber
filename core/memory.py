@@ -6,19 +6,25 @@ Nothing auto-promotes into curated. Ever."""
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
+
+from pydantic import BaseModel, ConfigDict, PrivateAttr
 
 
-@dataclass
-class Memory:
-    _episodes: list[dict] = field(default_factory=list)
-    _curated: dict[str, dict[str, str]] = field(default_factory=dict)
-    _store: object = field(default=None, repr=False)
+class Memory(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    def __post_init__(self):
-        if self._store is not None:
-            self._episodes = self._store.all_episodes()
-            self._curated = self._store.all_curated()
+    _episodes: list[dict] = PrivateAttr(default_factory=list)
+    _curated: dict[str, dict[str, str]] = PrivateAttr(default_factory=dict)
+    _store: object = PrivateAttr(default=None)
+
+    def __init__(self, _store=None, **data):
+        super().__init__(**data)
+        # Private-attribute kwargs are not reliably honoured by Pydantic's
+        # constructor, so the store is taken explicitly and loaded here.
+        self._store = _store
+        if _store is not None:
+            self._episodes = _store.all_episodes()
+            self._curated = _store.all_curated()
 
     def record(self, user_id: str, kind: str, payload: dict) -> None:
         ep = {"user_id": user_id, "kind": kind,
