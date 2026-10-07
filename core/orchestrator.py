@@ -42,6 +42,12 @@ class Ctx:
     memory: Memory = field(default_factory=Memory)
     trace: TraceLog = field(default_factory=TraceLog)
     trace_id: str = field(default_factory=new_trace_id)
+    # The caller's bearer token for THIS run, set by the API layer at
+    # execution time. Runtime-only: never persisted, never traced, and
+    # never placed in a prompt. It exists so tool/MCP calls made by
+    # subagents can forward it on-behalf-of the user to services that
+    # authorize the token themselves.
+    auth_token: str | None = field(default=None, repr=False)
 
 
 def _summarise(output) -> str:
@@ -66,11 +72,14 @@ def _format_output(output) -> str:
     return text
 
 
-def _task_prompt(task, original_prompt: str, outputs: dict) -> str:
+def _task_prompt(task, original_prompt: str, outputs: dict,
+                 curated_block: str = "") -> str:
     parts = [
         f"Original user request:\n{original_prompt}",
         f"Assigned task:\n{task.task}",
     ]
+    if curated_block:
+        parts.append(curated_block)
     if task.done_when:
         parts.append(f"Completion criterion:\n{task.done_when}")
     for source_id in task.input_from:
@@ -120,9 +129,10 @@ async def ask(prompt: str, ctx: Ctx, emit=None) -> VyberResult:
     routing_defects: list[str] = []
 
     workspace_files = list_files(ctx.workspace)[:100]
+    curated = ctx.memory.curated_block(ctx.user_id)
     planner_prompt = (
         f"User request: {prompt}\n"
-        f"Approved context: {ctx.memory.curated_block(ctx.user_id)}\n"
+        f"Approved context: {curated}\n"
         f"Current workspace files: {workspace_files}")
     try:
         raw_plan = await _run_agent(planner_agent, planner_prompt)
@@ -168,7 +178,8 @@ async def ask(prompt: str, ctx: Ctx, emit=None) -> VyberResult:
                 "agent": task.agent, "task": task.task, "task_id": task.id})
         results = await asyncio.gather(
             *(_run_agent(SUBAGENTS[task.agent],
-                         _task_prompt(task, prompt, outputs)) for task in ready),
+                         _task_prompt(task, prompt, outputs, curated))
+              for task in ready),
             return_exceptions=True)
 
         for task, result in zip(ready, results):

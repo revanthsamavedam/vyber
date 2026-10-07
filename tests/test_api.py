@@ -117,3 +117,25 @@ def test_run_events_stream_replays_steps():
     with client.stream("GET", f"/api/runs/{run_id}/events", headers=AUTH) as resp:
         text = "".join(resp.iter_text())
     assert '"type": "step"' in text and '"type": "result"' in text
+
+
+def test_run_carries_caller_token_for_obo(monkeypatch):
+    import json as _json
+
+    import api.main as api_main
+    from core.schemas import VyberResult
+
+    seen = {}
+
+    async def capture_ask(prompt, ctx, emit=None):
+        seen["token"] = ctx.auth_token
+        return VyberResult(summary="ok", steps=[])
+
+    monkeypatch.setattr(api_main, "ask", capture_ask)
+    sid = _session()
+    out = client.post("/api/chat", json={
+        "session_id": sid, "message": "Token check"}, headers=AUTH)
+    body = _wait_done(out.json()["run_id"])
+    assert body["status"] == "done"
+    assert seen["token"] == "demo:alice"  # the demo credential, scheme stripped
+    assert "demo:alice" not in _json.dumps(body)  # never leaks into run views

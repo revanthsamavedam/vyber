@@ -45,6 +45,10 @@ class Run:
     _subs: list[asyncio.Queue] = field(default_factory=list)
     _task: asyncio.Task | None = None
     _store: object = field(default=None, repr=False)
+    # Caller's bearer token, captured at submit time for on-behalf-of
+    # forwarding during execution. Runtime-only: never written to the
+    # store, never included in run views or events.
+    _auth_token: str | None = field(default=None, repr=False)
 
     def publish(self, event: dict) -> None:
         self.events.append(event)
@@ -99,14 +103,15 @@ class RunManager:
                 self._store.update_run(run.id, "failed", error=run.error)
             self.runs[run.id] = run
 
-    def submit(self, session_id: str, prompt: str) -> Run:
+    def submit(self, session_id: str, prompt: str,
+               auth_token: str | None = None) -> Run:
         active = [r for r in self.runs.values()
                   if r.session_id == session_id and r.status not in TERMINAL]
         if len(active) >= SETTINGS.max_queued_runs_per_session:
             raise QueueFullError(
                 f"session already has {len(active)} queued or running runs")
         run = Run(id=uuid.uuid4().hex[:12], session_id=session_id,
-                  prompt=prompt, _store=self._store)
+                  prompt=prompt, _store=self._store, _auth_token=auth_token)
         self.runs[run.id] = run
         if self._store is not None:
             self._store.create_run(run.id, session_id, prompt)

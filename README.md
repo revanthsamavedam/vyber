@@ -51,6 +51,29 @@ VYBER_MODEL="openai:gpt-5" uvicorn api.main:app --port 8091
 That env var (`core/models.py`) is the entire model integration — every
 agent in the system reads it, nothing else names a model.
 
+## Authentication
+
+Auth is one seam (`api/auth.py`), selected by `VYBER_AUTH_MODE`:
+
+- `demo` (default): `Bearer demo:<user>` — local development only.
+- `jwt`: validates `Bearer <jwt>` against a JWKS endpoint — signature,
+  issuer, audience, and expiry, failing closed. Point it at your identity
+  provider or your organization's JWT authorization service:
+
+```bash
+VYBER_AUTH_MODE=jwt
+VYBER_JWT_JWKS_URL=https://issuer.example/.well-known/jwks.json
+VYBER_JWT_ISSUER=https://issuer.example
+VYBER_JWT_AUDIENCE=vyber-api
+VYBER_JWT_USER_CLAIM=upn   # optional; which claim is the caller id (default: sub)
+```
+
+In jwt mode, missing configuration is a startup error — never a silent
+fall back to demo. The validated token is also carried on the run
+context (runtime-only: never persisted, never shown to a model) so tool
+and MCP calls can forward it on-behalf-of the user to services that
+authorize the token themselves.
+
 ## Production quality
 
 Read **[PRODUCTION.md](PRODUCTION.md)** for what is implemented and what

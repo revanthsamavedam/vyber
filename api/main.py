@@ -2,7 +2,9 @@
 vyber-ui repo (React) and talks to this service over HTTP.
 
 Run:  uvicorn api.main:app --port 8091
-Auth is a demo stub (Bearer demo:<user>) where real SSO would sit.
+Auth lives in api/auth.py — one seam, selected by VYBER_AUTH_MODE:
+"demo" (default, local only) or "jwt" (JWKS-validated bearer tokens
+from your identity provider / JWT authorization service).
 CORS: the UI's origin must be allowed — VYBER_CORS_ORIGINS is a
 comma-separated list (default covers the local Vite dev/preview ports).
 Model: VYBER_MODEL env var — see core/models.py.
@@ -13,7 +15,6 @@ import asyncio
 import json
 import logging
 import os
-import re
 import time
 import uuid
 from pathlib import Path
@@ -23,6 +24,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
+from api.auth import CALLER_RE, AuthError, build_authenticator
 from api.runs import QueueFullError, Run, RunManager
 from core.config import SETTINGS
 from core.memory import Memory
@@ -70,25 +72,24 @@ app.add_middleware(
     allow_headers=["*"])
 
 
-_CALLER_RE = re.compile(r"^[A-Za-z0-9_.@-]{1,64}$")
+AUTHENTICATOR = build_authenticator()
 
 
 @app.middleware("http")
 async def auth_mw(request: Request, call_next):
     started = time.perf_counter()
     supplied = request.headers.get("X-Request-ID", "")
-    request.state.request_id = supplied if _CALLER_RE.match(supplied) else uuid.uuid4().hex
+    request.state.request_id = supplied if CALLER_RE.match(supplied) else uuid.uuid4().hex
     public = request.url.path in ("/", "/healthz", "/readyz")
     if not public and request.method != "OPTIONS":
-        auth = request.headers.get("Authorization", "")
-        caller = auth.removeprefix("Bearer demo:").split(":")[0] \
-            if auth.startswith("Bearer demo:") else ""
-        if not _CALLER_RE.match(caller):
+        try:
+            request.state.caller = AUTHENTICATOR.authenticate(
+                request.headers.get("Authorization"))
+        except AuthError:
             response = JSONResponse(
                 status_code=401, content={"detail": "sign-in required"})
             response.headers["X-Request-ID"] = request.state.request_id
             return response
-        request.state.caller = caller
     response = await call_next(request)
     response.headers["X-Request-ID"] = request.state.request_id
     logger.info("%s %s -> %s %.1fms caller=%s request_id=%s",
@@ -110,6 +111,7 @@ async def unhandled_exception(request: Request, exc: Exception):
 @app.get("/")
 def root():
     return {"service": "vyber-api", "model": get_model(),
+            "auth": AUTHENTICATOR.mode,
             "ui": "vyber-ui (separate repo)"}
 
 
@@ -183,6 +185,7 @@ class ChatIn(BaseModel):
 
 async def _execute(run: Run) -> dict:
     ctx = SESSIONS[run.session_id]
+    ctx.auth_token = run._auth_token  # this run's credential, for OBO tool calls
 
     def emit(kind, payload):
         if kind == "step":
@@ -204,8 +207,10 @@ async def chat(body: ChatIn, request: Request):
     """Non-blocking: returns a run immediately. Watch it via
     GET /api/runs/{id}/events (SSE) or poll GET /api/runs/{id}."""
     _owned_session(request, body.session_id)
+    auth = request.headers.get("Authorization", "")
+    token = auth.removeprefix("Bearer ").strip() or None
     try:
-        run = MANAGER.submit(body.session_id, body.message)
+        run = MANAGER.submit(body.session_id, body.message, auth_token=token)
     except QueueFullError as e:
         raise HTTPException(429, str(e)) from e
     return {"run_id": run.id, "status": run.status}

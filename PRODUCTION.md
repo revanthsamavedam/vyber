@@ -32,9 +32,12 @@ application features.
 
 ## Required before real users
 
-1. **Replace demo auth.** `Bearer demo:<user>` is a development stub.
-   Put Vyber behind real SSO/OIDC and make the API trust the verified
-   caller identity from that layer.
+1. **Switch auth to JWT mode.** Demo mode is a development stub. The
+   seam is built (`api/auth.py`): set `VYBER_AUTH_MODE=jwt` with the
+   JWKS URL, issuer, and audience of your IdP or JWT authorization
+   service (plus `VYBER_JWT_USER_CLAIM` if the caller id is not in
+   `sub`). The caller's token is threaded to the run context for
+   on-behalf-of tool/MCP calls; it is never persisted.
 2. **Configure the real model and pass evals.** Set `VYBER_MODEL` to the
    Azure OpenAI deployment, run the routing suite repeatedly, and review
    failures before release. TestModel results do not measure judgment.
